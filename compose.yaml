@@ -1,0 +1,13 @@
+services:
+  postgres:
+    image: 'postgres:latest'
+    environment:
+      - 'POSTGRES_DB=jederKilometer'
+      ports:
+        - '5432'
+      volumes:
+        - './data:/var/lib/postgresql/data'
+      env_file:
+        - '.env'
+      restart: always
+
