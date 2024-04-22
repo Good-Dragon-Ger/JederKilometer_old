@@ -1,9 +1,8 @@
 package de.gooddragon.jederkilometer.application.service;
 
 import de.gooddragon.jederkilometer.domain.model.strava.EventAufzeichnung;
+import de.gooddragon.jederkilometer.domain.model.strava.Token;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.configurationprocessor.json.JSONException;
-import org.springframework.boot.configurationprocessor.json.JSONObject;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -12,7 +11,6 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Flux;
 
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
@@ -31,9 +29,9 @@ public class StravaService {
     private final WebClient webClient;
     private String token;
 
-    public StravaService(@Value("${spring.security.oauth2.client.registration.strava.client-id}") String clientId,
-                         @Value("${spring.security.oauth2.client.registration.strava.client-secret}") String clientSecret,
-                         @Value("${spring.security.oauth2.client.registration.strava.refresh-token}") String refreshToken,
+    public StravaService(@Value("${jederKilometer.strava.client-id}") String clientId,
+                         @Value("${jederKilometer.strava.client-secret}") String clientSecret,
+                         @Value("${jederKilometer.strava.refresh-token}") String refreshToken,
                          @Value("${jederKilometer.strava.clubId}") Long clubId,
                          @Value("${jederKilometer.strava.clubPage}") Integer page,
                          @Value("${jederKilometer.strava.pageEntries}") Integer perPage) {
@@ -66,7 +64,7 @@ public class StravaService {
     }
 
     private void save(List<EventAufzeichnung> activities) {
-        System.err.println("save to database" + activities);
+        System.err.println("save to database: " + activities);
     }
 
     private void getToken() {
@@ -76,28 +74,16 @@ public class StravaService {
         requestBody.add("grant_type", "refresh_token");
         requestBody.add("refresh_token", refreshToken);
 
-        Flux<String> response = webClient.post()
+        Token response = webClient.post()
                 .uri("/oauth/token")
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                 .body(BodyInserters.fromFormData(requestBody))
                 .retrieve()
-                .bodyToFlux(String.class)
-                .handle((responseBody, sink) -> {
-                    try {
-                        sink.next(extractAccessToken(responseBody));
-                    } catch (JSONException e) {
-                        sink.error(new RuntimeException(e));
-                    }
-                });
+                .bodyToMono(Token.class)
+                .block();
 
-        response.subscribe(
-                accessToken -> token = accessToken,
-                error -> System.err.println("Error: " + error.getMessage())
-        );
-    }
-
-    private static String extractAccessToken(String responseBody) throws JSONException {
-        JSONObject jsonObject = new JSONObject(responseBody);
-        return jsonObject.getString("access_token");
+        System.err.println(response);
+        assert response != null;
+        token = response.access_token();
     }
 }
